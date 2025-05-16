@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Chiller Control Dashboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 650px;
+    margin: auto;
+    background: #f9f9f9;
+    color: #333;
+  }
+  h1, h2 {
+    text-align: center;
+    color: #2c3e50;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 25px;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 10px 12px;
+    text-align: left;
+  }
+  th {
+    background-color: #3498db;
+    color: white;
+  }
+  ul {
+    list-style-type: none;
+    padding: 0;
+    margin-bottom: 30px;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 15px;
+  }
+  ul li {
+    padding: 6px 0;
+    font-weight: 600;
+  }
+  form {
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 20px;
+    border-radius: 6px;
+  }
+  label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 8px;
+    color: #34495e;
+  }
+  input[type="number"] {
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 15px;
+    font-size: 16px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  button {
+    padding: 10px 18px;
+    margin: 5px 8px 5px 0;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  button:hover {
+    background-color: #2980b9;
+  }
+  .status-label {
+    font-weight: normal;
+    color: #666;
+  }
+  .override-label {
+    color: red;
+    font-weight: bold;
+    margin-left: 8px;
+  }
+  .override-on {
+    background-color: #27ae60 !important; /* green */
+  }
+  .override-off {
+    background-color: #c0392b !important; /* red */
+  }
+</style>
+</head>
+<body>
+<h1>Chiller Control Dashboard</h1>
+
+<h2>Temperatures (°F)</h2>
+<table>
+  <thead>
+    <tr><th>Sensor</th><th>Temperature</th></tr>
+  </thead>
+  <tbody id="temps-table-body">
+    {% for sensor, temp in data.temps.items() %}
+    <tr>
+      <td>{{ sensor }}</td>
+      <td>{{ temp if temp is not none else "N/A" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Clear All Overrides Button -->
+<div style="text-align: center; margin-bottom: 25px;">
+  <button id="clear-all-overrides-btn" style="background-color: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+    Clear All Overrides
+  </button>
+</div>
+
+<h2>Status</h2>
+<ul>
+  <li>Full Chiller Call: <span id="status-full-chiller-call">Cooling Off</span></li>
+  <li>Pump: <span id="status-pump">Pump Off</span></li>
+  <li>Condenser: <span id="status-chiller">Chiller Off</span></li>
+  <li>AHU Call: <span id="status-ahu-call">Inactive</span></li>
+</ul>
+
+<h2>Setpoint Control</h2>
+<form method="POST" id="setpoint-form">
+  <label for="setpoint-input">
+    Chilled Water Setpoint: 
+    <span id="current-setpoint">{{ data.setpoint if data.setpoint is not none else "N/A" }}</span> °F
+  </label>
+  <input
+    type="number"
+    id="setpoint-input"
+    name="setpoint"
+    step="0.1"
+    placeholder="Enter new setpoint (°F)"
+    min="30" max="100"
+    value="{{ data.setpoint if data.setpoint is not none else '' }}"
+  />
+  
+  <br/><br/>
+  
+  <button type="submit">Change Setpoint</button>
+  
+  <br/><br/>
+
+  <label for="differential-input">
+    Differential (°F): 
+    <span id="current-differential">{{ data.differential if data.differential is not none else "N/A" }}</span>
+  </label>
+  <input
+    type="number"
+    id="differential-input"
+    name="differential"
+    step="0.1"
+    placeholder="Enter differential (°F)"
+    min="0.1" max="20"
+    value="{{ data.differential if data.differential is not none else '' }}"
+  />
+  
+</form>
+
+<h2>Manual Controls</h2>
+<form method="POST">
+  <label>
+    Pump:
+    <span id="override-pump" class="override-label"></span>
+  </label>
+  <button id="pump-on" name="pump" value="on" type="submit">On</button>
+  <button id="pump-off" name="pump" value="off" type="submit">Off</button>
+  <button name="pump" value="clear" type="submit">Reset</button>
+
+  <br/><br/>
+
+  <label>
+    Condenser:
+    <span id="override-chiller" class="override-label"></span>
+  </label>
+  <button id="chiller-on" name="chiller" value="on" type="submit">On</button>
+  <button id="chiller-off" name="chiller" value="off" type="submit">Off</button>
+  <button name="chiller" value="clear" type="submit">Reset</button>
+
+  <br/><br/>
+
+  <label>
+    AHU Call Override:
+    <span id="override-ahu" class="override-label"></span>
+  </label>
+  <button id="ahu-on" name="ahu_call" value="on" type="submit">Force ON</button>
+  <button id="ahu-off" name="ahu_call" value="off" type="submit">Force OFF</button>
+  <button name="ahu_call" value="clear" type="submit">Clear Override</button>
+</form>
+
+<script>
+function applyOverrideStyles(manualValue, onBtnId, offBtnId) {
+  const onBtn = document.getElementById(onBtnId);
+  const offBtn = document.getElementById(offBtnId);
+
+  // Remove any previous override styles
+  onBtn.classList.remove("override-on", "override-off");
+  offBtn.classList.remove("override-on", "override-off");
+
+  // Apply styles based on override value (manualValue is "Active" or "Inactive" or something else)
+  if (manualValue === "Active") {
+    // Assume Active means forced ON
+    onBtn.classList.add("override-on");
+  } else if (manualValue === "Forced Off" || manualValue === "Inactive" || manualValue === "Off") {
+    // Forced OFF or no override means highlight OFF button red if override
+    if(manualValue === "Forced Off") {
+      offBtn.classList.add("override-off");
+    }
+  }
+}
+
+async function fetchData() {
+  try {
+    const response = await fetch('/data');
+    const data = await response.json();
+
+    // Use server's computed value directly:
+    document.getElementById('status-full-chiller-call').textContent = data.full_chiller_call;
+
+    document.getElementById('status-pump').textContent = data.pump;
+    document.getElementById('status-chiller').textContent = data.chiller;
+    document.getElementById('status-ahu-call').textContent = data.ahu_call;
+
+    // Show "OVERRIDE" if any manual override is "Active"
+    document.getElementById('override-pump').textContent = (data.manual_override_pump === "Active") ? 'OVERRIDE' : '';
+    document.getElementById('override-chiller').textContent = (data.manual_override_chiller === "Active") ? 'OVERRIDE' : '';
+    document.getElementById('override-ahu').textContent = (data.manual_override_ahu === "Active") ? 'OVERRIDE' : '';
+
+    // Style buttons based on manual override values ("Active" means forced ON, else no style)
+    applyOverrideStyles(data.manual_override_pump, "pump-on", "pump-off");
+    applyOverrideStyles(data.manual_override_chiller, "chiller-on", "chiller-off");
+    applyOverrideStyles(data.manual_override_ahu, "ahu-on", "ahu-off");
+
+    // Update temperatures table
+    const tbody = document.getElementById('temps-table-body');
+    tbody.innerHTML = '';
+    for (const [sensor, temp] of Object.entries(data.temps)) {
+      const row = document.createElement('tr');
+      const sensorCell = document.createElement('td');
+      const tempCell = document.createElement('td');
+      sensorCell.textContent = sensor;
+      tempCell.textContent = temp !== null ? temp : 'N/A';
+      row.appendChild(sensorCell);
+      row.appendChild(tempCell);
+      tbody.appendChild(row);
+    }
+
+    // Update setpoint display
+    const sp = data.setpoint !== null ? data.setpoint : 'N/A';
+    document.getElementById('current-setpoint').textContent = sp;
+    document.getElementById('setpoint-input').value = (data.setpoint !== null) ? data.setpoint : '';
+
+  } catch (err) {
+    console.error('Error fetching data:', err);
+  }
+}
+
+fetchData();
+setInterval(fetchData, 5000);
+
+document.getElementById('setpoint-form').addEventListener('submit', () => {
+  setTimeout(() => {
+    document.getElementById('setpoint-input').value = '';
+  }, 50);
+});
+
+document.getElementById('clear-all-overrides-btn').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/clear-overrides', {
+      method: 'POST'
+    });
+    if (response.ok) {
+      alert('All overrides cleared!');
+      fetchData(); // Refresh the dashboard after clearing overrides
+    } else {
+      alert('Failed to clear overrides.');
+    }
+  } catch (error) {
+    console.error('Error clearing overrides:', error);
+    alert('Error clearing overrides.');
+  }
+});
+
+</script>
+
+</body>
+</html>
